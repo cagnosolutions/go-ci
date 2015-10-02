@@ -35,26 +35,36 @@ type CIServer struct {
 }
 
 func (c *CIServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// general http log
+	log.Printf("Received an HTTP %q request from %q\n", r.Method, r.RemoteAddr)
 	if r.Method != "POST" {
+		log.Println("r.Method != POST")
 		return
 	}
 	if r.Header.Get("X-GitHub-Event") != "push" {
+		log.Printf("X-GitHub-Event != push (%s)\n", r.Header.Get("X-GitHub-Event"))
 		return
 	}
-	if strings.HasPrefix(r.Header.Get("User-Agent"), "GitHub-Hookshot/") {
+	if !strings.HasPrefix(r.Header.Get("User-Agent"), "GitHub-Hookshot/") {
+		log.Printf("User-Agent !startWith(GitHub-Hookshot/) (%s)\n", r.Header.Get("User-Agent"))
 		return
 	}
 	// valid method and sender, parse body
+	log.Println("Valid r.Method and sender, attempting decode/parse body...")
 	dec := json.NewDecoder(r.Body)
 	var m M
 	if err := dec.Decode(&m); err != nil {
 		log.Fatal("CIServer.ServeHTTP() -> json decode: ", err)
 	}
 	// get repository name from map
+	log.Println("Successfully decoded body, get repository name from map...")
 	repo := m.find("repository", "full_name")
 	if repo == nil {
 		log.Fatal("CIServer.ServeHTTP() -> M.Find(): repository is nil")
 	}
+	log.Println("Repository name is: ", repo.(string))
+	// log that we got a repo push
+	log.Printf("Received PUSH from GitHub for repoistory %q\n", repo.(string))
 	// check if repo exists locally
 	info, err := os.Stat(repo.(string))
 	if err != nil && os.IsNotExist(err) {
